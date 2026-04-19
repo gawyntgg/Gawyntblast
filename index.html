@@ -1,1 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gawynt Blast | FINAL EDITION</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;900&display=swap');
 
+        :root {
+            --bg-color: #050508;
+            --panel-bg: #12121a;
+            --cell-empty: #1e1e2d;
+            --text-main: #ffffff;
+            --accent: #00f0ff;
+            --hue: 0deg;
+            --shake: 0px;
+        }
+
+        * {
+            box-sizing: border-box;
+            touch-action: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Subtle Background Glow */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 50%; left: 50%; width: 100vw; height: 100vh;
+            background: radial-gradient(circle, rgba(0, 240, 255, 0.08) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            filter: hue-rotate(var(--hue));
+            z-index: -1;
+        }
+
+        /* UI Styling */
+        .game-header { text-align: center; margin-bottom: 20px; filter: hue-rotate(var(--hue)); }
+        
+        h1 {
+            font-size: 3rem; margin: 0; font-weight: 900; letter-spacing: -2px;
+            background: linear-gradient(to bottom, #fff 30%, var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        .stats-container { display: flex; gap: 40px; justify-content: center; margin-top: 10px; }
+        .stat-box { display: flex; flex-direction: column; align-items: center; }
+        .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; opacity: 0.6; }
+        .stat-value { font-size: 1.8rem; font-weight: 900; color: var(--accent); transition: transform 0.2s; }
+
+        /* Board Styling */
+        #game-container {
+            position: relative; padding: 12px; background: var(--panel-bg);
+            border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            transform: translate(var(--shake), var(--shake));
+        }
+
+        #grid { display: grid; grid-template-columns: repeat(8, 45px); grid-template-rows: repeat(8, 45px); gap: 5px; }
+
+        .cell { width: 45px; height: 45px; background: var(--cell-empty); border-radius: 6px; transition: 0.1s; }
+
+        .filled {
+            box-shadow: inset 0 -4px 0 rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.2);
+            animation: blockPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .ghost { opacity: 0.3 !important; filter: brightness(1.2); }
+
+        @keyframes blockPop { 0% { transform: scale(0.6); } 100% { transform: scale(1); } }
+
+        .clearing { animation: clearBlast 0.4s forwards; z-index: 10; }
+        @keyframes clearBlast { 0% { transform: scale(1); filter: brightness(4); } 100% { transform: scale(0); opacity: 0; } }
+
+        /* Dock Styling */
+        #dock { margin-top: 30px; display: flex; justify-content: space-around; width: 100%; max-width: 420px; height: 140px; }
+        .dock-slot { width: 110px; height: 110px; display: flex; align-items: center; justify-content: center; border-radius: 15px; }
+        
+        .shape { display: grid; cursor: grab; filter: hue-rotate(var(--hue)); transition: transform 0.2s; }
+        .s-cell { width: 22px; height: 22px; border-radius: 4px; margin: 1px; }
+
+        /* Overlay Proxy */
+        #drag-overlay {
+            position: fixed; pointer-events: none; display: none; z-index: 1000;
+            filter: hue-rotate(var(--hue)); transform: scale(1.6); transform-origin: center center;
+        }
+
+        #floating-text {
+            position: absolute; width: 100%; text-align: center; top: 35%;
+            pointer-events: none; font-weight: 900; font-size: 3.5rem; color: #ffcc00;
+            text-shadow: 0 5px 20px rgba(0,0,0,0.6); z-index: 100; display: none;
+        }
+
+        /* Block Colors */
+        .c-blue { background: linear-gradient(135deg, #00d2ff, #3a7bd5); }
+        .c-red { background: linear-gradient(135deg, #f85032, #e73827); }
+        .c-green { background: linear-gradient(135deg, #11998e, #38ef7d); }
+        .c-purple { background: linear-gradient(135deg, #8e2de2, #4a00e0); }
+        .c-orange { background: linear-gradient(135deg, #f2994a, #f2c94c); }
+
+        /* Game Over */
+        #game-over {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); display: none; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 2000;
+        }
+
+        .btn-restart {
+            margin-top: 30px; padding: 15px 50px; font-family: inherit; font-size: 1.2rem;
+            font-weight: 900; border: none; border-radius: 50px; background: var(--accent);
+            color: #000; cursor: pointer;
+        }
+
+        @media (max-width: 450px) {
+            #grid { grid-template-columns: repeat(8, 38px); grid-template-rows: repeat(8, 38px); }
+            .cell { width: 38px; height: 38px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-header">
+        <h1>GAWYNT BLAST</h1>
+        <div class="stats-container">
+            <div class="stat-box"><span class="stat-label">Score</span><span id="score" class="stat-value">0</span></div>
+            <div class="stat-box"><span class="stat-label">Best</span><span id="high-score" class="stat-value">0</span></div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <div id="grid"></div>
+        <div id="floating-text">COMBO!</div>
+    </div>
+
+    <div id="dock">
+        <div class="dock-slot" data-slot="0"></div>
+        <div class="dock-slot" data-slot="1"></div>
+        <div class="dock-slot" data-slot="2"></div>
+    </div>
+
+    <div id="drag-overlay"></div>
+
+    <div id="game-over">
+        <h2 style="font-size: 3.5rem; color: #ff3366; margin:0;">GAME OVER</h2>
+        <p id="final-score" style="font-size: 1.5rem;"></p>
+        <button class="btn-restart" onclick="resetGame()">PLAY AGAIN</button>
+    </div>
+
+    <script>
+        /** * AUDIO ENGINE (Synthesized sounds)
+         */
+        const AudioEngine = {
+            ctx: null,
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            playGrab() {
+                this.init(); const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 0.1);
+            },
+            playPlace() {
+                this.init(); const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'square'; osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime); gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.15);
+                osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 0.15);
+            },
+            playBlast() {
+                this.init(); const noise = this.ctx.createBufferSource(); const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.3, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0); for(let i=0; i<data.length; i++) data[i] = Math.random() * 2 - 1;
+                noise.buffer = buffer; const gain = this.ctx.createGain(); gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3); noise.connect(gain); gain.connect(this.ctx.destination); noise.start();
+            },
+            playCombo(lvl) {
+                this.init(); const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'triangle'; const freq = 400 + (lvl * 100); osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+                osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 0.4);
+            },
+            playGameOver() {
+                this.init(); const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(50, this.ctx.currentTime + 1);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime); gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1);
+                osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 1);
+            }
+        };
+
+        /**
+         * GAME ENGINE
+         */
+        const GRID_SIZE = 8;
+        let score = 0, combo = 0, hue = 0;
+        let highScore = localStorage.getItem('gawynt_final_best') || 0;
+        let board = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
+        let dockState = [null, null, null];
+        let activeDrag = null;
+
+        const SHAPES = [
+            { s: [[1,1],[1,1]], c: 'c-blue' }, { s: [[1,1,1,1]], c: 'c-red' },
+            { s: [[1],[1],[1],[1]], c: 'c-red' }, { s: [[1,1,1],[0,1,0]], c: 'c-purple' },
+            { s: [[1,1,1],[1,0,0]], c: 'c-orange' }, { s: [[1,1,1]], c: 'c-green' },
+            { s: [[1,1]], c: 'c-blue' }, { s: [[1]], c: 'c-orange' }
+        ];
+
+        function init() {
+            document.getElementById('high-score').innerText = highScore;
+            const gridEl = document.getElementById('grid');
+            gridEl.innerHTML = '';
+            for(let r=0; r<GRID_SIZE; r++) {
+                for(let c=0; c<GRID_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell'; cell.id = `cell-${r}-${c}`;
+                    gridEl.appendChild(cell);
+                }
+            }
+            refreshDock();
+        }
+
+        function refreshDock() {
+            hue += 50; document.documentElement.style.setProperty('--hue', `${hue}deg`);
+            document.querySelectorAll('.dock-slot').forEach((slot, i) => {
+                const data = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+                dockState[i] = data;
+                slot.innerHTML = '';
+                const el = document.createElement('div');
+                el.className = 'shape'; el.style.gridTemplateColumns = `repeat(${data.s[0].length}, 1fr)`;
+                data.s.forEach(row => row.forEach(v => {
+                    const c = document.createElement('div');
+                    c.className = v ? `s-cell ${data.c}` : 's-cell';
+                    c.style.opacity = v ? '1' : '0'; el.appendChild(c);
+                }));
+                el.addEventListener('pointerdown', (e) => startDrag(e, data, i, el));
+                slot.appendChild(el);
+            });
+            setTimeout(checkGameOver, 300);
+        }
+
+        function startDrag(e, data, idx, el) {
+            AudioEngine.playGrab();
+            activeDrag = { data, idx, el };
+            const overlay = document.getElementById('drag-overlay');
+            overlay.innerHTML = el.innerHTML; overlay.style.display = 'grid';
+            overlay.style.gridTemplateColumns = el.style.gridTemplateColumns;
+            overlay.style.width = el.offsetWidth + 'px';
+            el.style.visibility = 'hidden';
+            moveDrag(e);
+            window.addEventListener('pointermove', moveDrag);
+            window.addEventListener('pointerup', endDrag);
+        }
+
+        function moveDrag(e) {
+            const overlay = document.getElementById('drag-overlay');
+            overlay.style.left = `${e.clientX - overlay.offsetWidth/2}px`;
+            overlay.style.top = `${e.clientY - overlay.offsetHeight/2 - 90}px`;
+            clearGhosts();
+            const coord = getCoord(e);
+            if(coord && canFit(activeDrag.data.s, coord.r, coord.c)) {
+                showGhost(activeDrag.data.s, coord.r, coord.c, activeDrag.data.c);
+            }
+        }
+
+        function endDrag(e) {
+            window.removeEventListener('pointermove', moveDrag);
+            window.removeEventListener('pointerup', endDrag);
+            document.getElementById('drag-overlay').style.display = 'none';
+            const coord = getCoord(e);
+            if(coord && canFit(activeDrag.data.s, coord.r, coord.c)) {
+                AudioEngine.playPlace();
+                placeBlock(activeDrag.data, coord.r, coord.c);
+                document.querySelector(`.dock-slot[data-slot="${activeDrag.idx}"]`).innerHTML = '';
+                dockState[activeDrag.idx] = null;
+                processClears();
+                if(dockState.every(s => s === null)) refreshDock();
+                else checkGameOver();
+            } else {
+                activeDrag.el.style.visibility = 'visible';
+            }
+            clearGhosts();
+        }
+
+        function getCoord(e) {
+            const x = e.clientX, y = e.clientY - 90;
+            const el = document.elementFromPoint(x, y);
+            if(el && el.id.startsWith('cell-')) {
+                const p = el.id.split('-');
+                return { r: parseInt(p[1]), c: parseInt(p[2]) };
+            }
+            return null;
+        }
+
+        function canFit(shape, startR, startC) {
+            for(let r=0; r<shape.length; r++) {
+                for(let c=0; c<shape[r].length; c++) {
+                    if(shape[r][c]) {
+                        const tr = startR + r, tc = startC + c;
+                        if(tr >= GRID_SIZE || tc >= GRID_SIZE || board[tr][tc]) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function placeBlock(data, startR, startC) {
+            data.s.forEach((row, r) => row.forEach((v, c) => {
+                if(v) {
+                    board[startR+r][startC+c] = data.c;
+                    const cell = document.getElementById(`cell-${startR+r}-${startC+c}`);
+                    cell.className = `cell filled ${data.c}`;
+                    cell.style.filter = `hue-rotate(${hue}deg)`;
+                }
+            }));
+            score += 10; updateUI();
+        }
+
+        function processClears() {
+            let rC = [], cC = [];
+            for(let r=0; r<GRID_SIZE; r++) if(board[r].every(v => v)) rC.push(r);
+            for(let c=0; c<GRID_SIZE; c++) {
+                let full = true;
+                for(let r=0; r<GRID_SIZE; r++) if(!board[r][c]) full = false;
+                if(full) cC.push(c);
+            }
+
+            if(rC.length || cC.length) {
+                combo++; AudioEngine.playBlast();
+                if(combo > 1) { AudioEngine.playCombo(combo); showComboPop(); }
+                score += (rC.length + cC.length) * 100 * combo;
+                triggerShake();
+                rC.forEach(r => { for(let c=0; c<GRID_SIZE; c++) blastCell(r, c); });
+                cC.forEach(c => { for(let r=0; r<GRID_SIZE; r++) blastCell(r, c); });
+            } else { combo = 0; }
+            updateUI();
+        }
+
+        function blastCell(r, c) {
+            board[r][c] = null;
+            const el = document.getElementById(`cell-${r}-${c}`);
+            el.classList.add('clearing');
+            setTimeout(() => el.className = 'cell', 400);
+        }
+
+        function checkGameOver() {
+            let possible = false;
+            dockState.forEach(shape => {
+                if(!shape) return;
+                for(let r=0; r<=GRID_SIZE-shape.s.length; r++) {
+                    for(let c=0; c<=GRID_SIZE-shape.s[0].length; c++) {
+                        if(canFit(shape.s, r, c)) possible = true;
+                    }
+                }
+            });
+            if(!possible && dockState.some(s => s !== null)) {
+                AudioEngine.playGameOver();
+                document.getElementById('final-score').innerText = `Score: ${score}`;
+                document.getElementById('game-over').style.display = 'flex';
+                if(score > highScore) localStorage.setItem('gawynt_final_best', score);
+            }
+        }
+
+        function triggerShake() {
+            const r = document.documentElement;
+            r.style.setProperty('--shake', '6px');
+            setTimeout(() => r.style.setProperty('--shake', '-6px'), 50);
+            setTimeout(() => r.style.setProperty('--shake', '0px'), 100);
+        }
+
+        function showComboPop() {
+            const el = document.getElementById('floating-text');
+            el.innerText = `${combo} COMBO!`; el.style.display = 'block';
+            el.style.animation = 'comboPop 0.8s forwards';
+            setTimeout(() => el.style.display = 'none', 800);
+        }
+
+        function clearGhosts() { document.querySelectorAll('.cell').forEach(c => c.classList.remove('ghost')); }
+        function showGhost(s, sr, sc, cl) {
+            s.forEach((row, r) => row.forEach((v, c) => {
+                if(v) document.getElementById(`cell-${sr+r}-${sc+c}`).classList.add('filled', cl, 'ghost');
+            }));
+        }
+
+        function updateUI() {
+            document.getElementById('score').innerText = score;
+            if(score > highScore) document.getElementById('high-score').innerText = score;
+        }
+
+        function resetGame() {
+            score = 0; combo = 0; board = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null));
+            document.getElementById('game-over').style.display = 'none'; init(); updateUI();
+        }
+
+        const style = document.createElement('style');
+        style.innerHTML = `@keyframes comboPop { 0% { transform: scale(0.5) translateY(20px); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: translateY(-40px); opacity: 0; } }`;
+        document.head.appendChild(style);
+
+        init();
+    </script>
+</body>
+</html>
